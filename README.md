@@ -1,6 +1,16 @@
 # TipTrip — Milestone 1, Phase 1
 
+## Run the Expo UI scaffold
+
+1. Install Node.js and npm, then run `npm install` in the repository root.
+2. Copy `.env.example` to `.env.local` (or configure Expo public environment variables) and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` for live data. Leave them unset to preview with sample travel tips.
+3. Run `npx expo start` and open the project in Expo Go or a configured simulator. `react-native-maps` may require a development build for some native configurations.
+
+The starter UI includes Explore, Feed, Trips, Map and Profile tabs, a teal/mint theme, 12 category filters, memoized map markers, and a debounced viewport RPC call. It is a new scaffold because the branch did not contain an existing app entry point or package manifest when inspected.
+
 ## Included
+- `App.js` and `package.json` — Expo UI scaffold and dependencies.
+- `src/theme/tiptripTheme.js`, `src/theme/tipCategories.js`, `src/components/TipMarker.jsx` — shared theme, category filters and optimized marker.
 - `supabase/migrations/20261009000100_milestone_1_core_schema.sql`
   - PostGIS extension, core tables, indexes, viewport RPC, profile bootstrap trigger, and RLS.
 - `.env.example`
