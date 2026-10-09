@@ -51,8 +51,8 @@ as $$
     and min_lng <= max_lng
     and p.status = 'active'
     and extensions.st_intersects(
-      p.location::extensions.geometry,
-      extensions.st_makeenvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+      p.location,
+      extensions.st_makeenvelope(min_lng, min_lat, max_lng, max_lat, 4326)::extensions.geography
     );
 $$;
 
