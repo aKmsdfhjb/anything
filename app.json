@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "TipTrip",
+    "slug": "tiptrip",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F4F6F8"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "web": {}
+  }
+}
