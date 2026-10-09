@@ -1,0 +1,20 @@
+name: Milestone 1 verification
+
+on:
+  push:
+    branches: [milestone1]
+  pull_request:
+    branches: [milestone1]
+
+jobs:
+  static-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run static Phase 1 and Phase 2 acceptance checks
+        run: npm run verify:phase1-2
+      - name: Validate package manifest
+        run: node -e "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')); console.log('package.json valid')"
