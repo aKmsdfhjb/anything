@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, FlatList, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View
@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import TipMarker from './src/components/TipMarker';
 import { colors, radii, shadows, spacing, typography, categoryColors } from './src/theme/tiptripTheme';
 import { TIP_CATEGORIES } from './src/theme/tipCategories';
+import { useMapPinStore } from './src/state/mapPinStore';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -145,7 +146,7 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, region, 
       </ScrollView>
       <View style={styles.mapFrame}>
         <MapView style={StyleSheet.absoluteFill} initialRegion={INITIAL_REGION} region={region} onRegionChangeComplete={r => { setRegion(r); onRegionChange(r); }} showsUserLocation={false} showsCompass>
-          {visiblePins.map(pin => <TipMarker key={pin.id} pin={pin} onPress={onSelectPin} />)}
+          {visiblePins.map(pin => <TipMarker key={pin.id} pin={pin} selected={selectedPin?.id === pin.id} onPress={onSelectPin} />)}
         </MapView>
         {loading ? <View style={styles.mapStatus}><ActivityIndicator color={colors.teal} /><Text style={styles.mapStatusText}>Finding tips in this area…</Text></View> : null}
         {error ? <View style={styles.mapStatus}><Text style={styles.mapStatusText}>{error}</Text></View> : null}
@@ -166,12 +167,12 @@ function EmptyState({ title, body }) { return <View style={styles.emptyState}><T
 
 export default function App() {
   const [tab, setTab] = useState('explore');
-  const [pins, setPins] = useState(DEMO_TIPS);
+  const pins = useMapPinStore(state => state.pins);\n  const setPins = useMapPinStore(state => state.setPins);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [region, setRegion] = useState(INITIAL_REGION);
   const [selectedPin, setSelectedPin] = useState(null);
-  const [selectedDestination, setSelectedDestination] = useState(null);
+  const requestSequence = useRef(0);\n  const debounceTimer = useRef(null);
 
   const loadViewport = useCallback(async nextRegion => {
     if (!supabase) { setPins(DEMO_TIPS); setError(''); return; }
@@ -227,7 +228,7 @@ export default function App() {
       <View style={styles.main}>
         {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} /> : null}
         {tab === 'feed' ? <FeedScreen /> : null}
-        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} region={region} setRegion={setRegion} /> : null}
+        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
         {tab === 'trips' ? <TripsScreen /> : null}
         {tab === 'profile' ? <ProfileScreen /> : null}
       </View>
