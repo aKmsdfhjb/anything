@@ -10,6 +10,7 @@ import TipMarker from './src/components/TipMarker';
 import { colors, radii, shadows, spacing, typography, categoryColors } from './src/theme/tiptripTheme';
 import { TIP_CATEGORIES } from './src/theme/tipCategories';
 import { useMapPinStore } from './src/state/mapPinStore';
+import { useMapPinStore } from './src/state/mapPinStore';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -135,8 +136,9 @@ function FeedScreen() {
   );
 }
 
-function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, region, setRegion }) {
-  const [category, setCategory] = useState('all');
+function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, selectedPin, region, setRegion }) {
+  const category = useMapPinStore(state => state.activeCategory);
+  const setCategory = useMapPinStore(state => state.setActiveCategory);
   const visiblePins = pins.filter(p => category === 'all' || String(p.category || 'general').toLowerCase() === category);
   return (
     <View style={styles.mapScreen}>
@@ -175,7 +177,8 @@ export default function App() {
   const requestSequence = useRef(0);\n  const debounceTimer = useRef(null);
 
   const loadViewport = useCallback(async nextRegion => {
-    if (!supabase) { setPins(DEMO_TIPS); setError(''); return; }
+    const requestId = ++requestSequence.current;
+    if (!supabase) { setPins(DEMO_TIPS, 'demo'); setError(''); return; }
     setLoading(true); setError('');
     const latPad = nextRegion.latitudeDelta / 2;
     const lngPad = nextRegion.longitudeDelta / 2;
@@ -191,24 +194,23 @@ export default function App() {
         const point = row.location?.coordinates;
         return { ...row, latitude: row.latitude ?? point?.[1], longitude: row.longitude ?? point?.[0] };
       }).filter(p => Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)));
-      setPins(livePins);
+      if (requestId === requestSequence.current) setPins(livePins, [nextRegion.latitude, nextRegion.longitude, nextRegion.latitudeDelta, nextRegion.longitudeDelta].join(':'));
     } catch (e) {
-      setError('Could not load live pins. Check Supabase setup and RLS.');
-      setPins([]);
-    } finally { setLoading(false); }
+      if (requestId === requestSequence.current) { setError('Could not load live pins. Check Supabase setup and RLS.'); setPins([], null); }
+    } finally { if (requestId === requestSequence.current) setLoading(false); }
   }, []);
 
   const scheduleViewportLoad = useCallback(nextRegion => {
     // The map component calls this on settled regions; use a short debounce to avoid
     // issuing a database request for every intermediate gesture frame.
-    if (scheduleViewportLoad.timer) clearTimeout(scheduleViewportLoad.timer);
-    scheduleViewportLoad.timer = setTimeout(() => loadViewport(nextRegion), 300);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => loadViewport(nextRegion), 300);
   }, [loadViewport]);
 
   useEffect(() => { if (tab === 'map') scheduleViewportLoad(region); }, [tab, region, scheduleViewportLoad]);
+  useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); requestSequence.current += 1; }, []);
 
   const chooseDestination = useCallback(item => {
-    setSelectedDestination(item);
     setTab('map');
     const target = item.id === 'rhodes' ? { ...INITIAL_REGION, latitude: 36.1667, longitude: 27.95 } : item.id === 'bali' ? { ...INITIAL_REGION, latitude: -8.4095, longitude: 115.1889 } : INITIAL_REGION;
     setRegion(target);
