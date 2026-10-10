@@ -166,7 +166,7 @@ function FeedScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           {[{ id: 'all', label: 'All' }, ...TIP_CATEGORIES].map(c => <Pressable key={c.id} onPress={() => setCategory(c.id)} style={[styles.filterChip, category === c.id && styles.filterChipActive]}><Text style={[styles.filterText, category === c.id && styles.filterTextActive]}>{c.label}</Text></Pressable>)}
         </ScrollView>
-        {visible.length ? visible.map(item => <TipCard key={item.id} item={item} onLove={() => {}} /> : <EmptyState title="No tips found yet" body="Try another search or category." />)}
+        {visible.length ? visible.map(item => <TipCard key={item.id} item={item} onLove={() => {}} />) : <EmptyState title="No tips found yet" body="Try another search or category." />}
       </View>
     </ScrollView>
   );
