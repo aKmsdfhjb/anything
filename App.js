@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Pressable, SafeAreaView, ScrollView,
+  ActivityIndicator, FlatList, Modal, Pressable, SafeAreaView, ScrollView,
   StatusBar, StyleSheet, Text, TextInput, View
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -202,6 +202,107 @@ function ProfileScreen() {
   return <View style={styles.screen}><BrandHeader eyebrow="YOUR TRAVEL PROFILE" title="Your profile" subtitle="Your discoveries, all in one place." /><View style={styles.profileCard}><View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>✈</Text></View><Text style={styles.profileName}>Welcome, traveler!</Text><Text style={styles.profileDescription}>Connect authentication to save your profile, tips and trips.</Text></View></View>;
 }
 function EmptyState({ title, body }) { return <View style={styles.emptyState}><Text style={styles.emptyTitle}>{title}</Text><Text style={styles.emptyBody}>{body}</Text></View>; }
+
+function AddTipModal({ visible, destination, defaultRegion, onClose, onSubmit }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('general');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!visible) return;
+    setTitle('');
+    setDescription('');
+    setCategory('general');
+    setLatitude(destination?.region ? String(destination.region.latitude) : '');
+    setLongitude(destination?.region ? String(destination.region.longitude) : '');
+    setError('');
+  }, [visible, destination]);
+  const submit = async () => {
+    setBusy(true); setError('');
+    try {
+      await onSubmit({
+        title, description, category,
+        latitude: latitude.trim() ? Number(latitude) : NaN,
+        longitude: longitude.trim() ? Number(longitude) : NaN,
+        city: destination?.title || destination?.placeName || null,
+        countryCode: null,
+      });
+    } catch (e) {
+      setError(e.message || 'Could not add this tip.');
+    } finally { setBusy(false); }
+  };
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeading}><Text style={styles.modalTitle}>Add a Place & Tip</Text><Pressable onPress={onClose}><Text style={styles.modalClose}>×</Text></Pressable></View>
+          <Text style={styles.modalHelp}>Share a useful tip with the TipTrip community.</Text>
+          {destination?.title ? <Text style={styles.selectedDestinationLabel}>Destination: {destination.title}</Text> : null}
+          <TextInput style={styles.formInput} value={title} onChangeText={setTitle} placeholder="Tip title" placeholderTextColor={colors.muted} maxLength={255} />
+          <TextInput style={[styles.formInput, styles.formTextarea]} value={description} onChangeText={setDescription} placeholder="What should travelers know?" placeholderTextColor={colors.muted} multiline />
+          <Text style={styles.formLabel}>Category</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            {TIP_CATEGORIES.map(item => <Pressable key={item.id} onPress={() => setCategory(item.id)} style={[styles.filterChip, category === item.id && styles.filterChipActive]}><Text style={[styles.filterText, category === item.id && styles.filterTextActive]}>{item.label}</Text></Pressable>)}
+          </ScrollView>
+          <Text style={styles.formLabel}>Coordinates (required)</Text>
+          <View style={styles.coordinateRow}><TextInput style={[styles.formInput, styles.coordinateInput]} value={latitude} onChangeText={setLatitude} placeholder="Latitude" keyboardType="decimal-pad" placeholderTextColor={colors.muted} /><TextInput style={[styles.formInput, styles.coordinateInput]} value={longitude} onChangeText={setLongitude} placeholder="Longitude" keyboardType="decimal-pad" placeholderTextColor={colors.muted} /></View>
+          {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+          <Pressable disabled={busy} style={[styles.primaryButton, busy && styles.disabledButton]} onPress={submit}><Text style={styles.primaryButtonText}>{busy ? 'Publishing…' : 'Publish tip'}</Text></Pressable>
+          <Text style={styles.modalFootnote}>You must be signed in. Add only places and coordinates you can reasonably verify.</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function SaveTripModal({ visible, pin, onClose, onSave }) {
+  const [trips, setTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState('');
+  const [newTripTitle, setNewTripTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    if (visible && supabase) {
+      listMyTrips(supabase).then(result => {
+        if (active) { setTrips(result.trips); setSelectedTrip(result.trips[0]?.id || ''); }
+      }).catch(e => { if (active) setError(e.message || 'Could not load trips.'); });
+    } else if (visible) {
+      setError('Connect Supabase and sign in to save tips to a trip.');
+    }
+    return () => { active = false; };
+  }, [visible]);
+  const save = async () => {
+    setBusy(true); setError('');
+    try {
+      let tripId = selectedTrip;
+      if (!tripId && newTripTitle.trim()) {
+        const created = await createTrip(supabase, newTripTitle);
+        tripId = created.id;
+      }
+      if (!tripId) throw new Error('Choose a trip or enter a name for a new one.');
+      await onSave(tripId, pin);
+      onClose();
+    } catch (e) { setError(e.message || 'Could not save this tip.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+        <View style={styles.modalHeading}><Text style={styles.modalTitle}>Save tip to trip</Text><Pressable onPress={onClose}><Text style={styles.modalClose}>×</Text></Pressable></View>
+        <Text style={styles.modalHelp} numberOfLines={2}>{pin?.title || 'Choose a trip for this tip.'}</Text>
+        {trips.map(trip => <Pressable key={trip.id} onPress={() => { setSelectedTrip(trip.id); setNewTripTitle(''); }} style={[styles.tripChoice, selectedTrip === trip.id && styles.tripChoiceActive]}><Text style={[styles.tripChoiceText, selectedTrip === trip.id && styles.tripChoiceTextActive]}>{selectedTrip === trip.id ? '● ' : '○ '}{trip.title}</Text></Pressable>)}
+        <Text style={styles.formLabel}>{trips.length ? 'Or create a new trip' : 'Create your first trip'}</Text>
+        <TextInput style={styles.formInput} value={newTripTitle} onChangeText={value => { setNewTripTitle(value); if (value) setSelectedTrip(''); }} placeholder="e.g. Summer in Greece" placeholderTextColor={colors.muted} />
+        {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+        <Pressable disabled={busy || !supabase} style={[styles.primaryButton, (busy || !supabase) && styles.disabledButton]} onPress={save}><Text style={styles.primaryButtonText}>{busy ? 'Saving…' : 'Save to trip'}</Text></Pressable>
+      </View></View>
+    </Modal>
+  );
+}
 
 export default function App() {
   const [tab, setTab] = useState('explore');
