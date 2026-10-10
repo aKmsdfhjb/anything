@@ -172,9 +172,9 @@ function FeedScreen() {
   );
 }
 
-function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPlace, selectedPin, region, setRegion }) {
+function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPlace, selectedPin, region, setRegion, cameraCommand }) {
   const mapRef = useRef(null);
-  useEffect(() => { if (region) mapRef.current?.animateToRegion(region, 550); }, [region]);
+  useEffect(() => { if (cameraCommand > 0 && region) mapRef.current?.animateToRegion(region, 550); }, [cameraCommand]);
   const category = useMapPinStore(state => state.activeCategory);
   const setCategory = useMapPinStore(state => state.setActiveCategory);
   const visiblePins = pins.filter(p => category === 'all' || String(p.category || 'general').toLowerCase() === category);
@@ -191,7 +191,7 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPla
         {loading ? <View style={styles.mapStatus}><ActivityIndicator color={colors.teal} /><Text style={styles.mapStatusText}>Finding tips in this area…</Text></View> : null}
         {error ? <View style={styles.mapStatus}><Text style={styles.mapStatusText}>{error}</Text></View> : null}
         {!loading && visiblePins.length === 0 ? <View style={styles.mapEmptyOverlay}><Text style={styles.fallbackTitle}>Don't see your place?</Text><Text style={styles.fallbackBody}>There are no tips in this map view yet. Be the first to add one.</Text><Pressable style={styles.primaryButton} onPress={() => onAddPlace({ title: '', region })}><Text style={styles.primaryButtonText}>＋ Add a Place & Tip</Text></Pressable></View> : null}
-        <Pressable style={styles.recenterButton} onPress={() => { setRegion(INITIAL_REGION); onRegionChange(INITIAL_REGION); }}><Text style={styles.recenterText}>◎</Text></Pressable>
+        <Pressable style={styles.recenterButton} onPress={() => { setRegion(INITIAL_REGION); mapRef.current?.animateToRegion(INITIAL_REGION, 550); onRegionChange(INITIAL_REGION); }}><Text style={styles.recenterText}>◎</Text></Pressable>
       </View>
       <View style={styles.mapLegend}><Text style={styles.mapLegendTitle}>{visiblePins.length} tips in view</Text><Text style={styles.mapLegendSub}>{supabase ? 'Connected to Supabase' : 'Preview data · add Supabase keys to load live tips'}</Text></View>
     </View>
@@ -344,6 +344,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [region, setRegion] = useState(INITIAL_REGION);
+  const [cameraCommand, setCameraCommand] = useState(0);
   const [selectedPin, setSelectedPin] = useState(null);
   const [addTipDestination, setAddTipDestination] = useState(null);
   const [addTipVisible, setAddTipVisible] = useState(false);
@@ -406,6 +407,7 @@ export default function App() {
     const resolved = destinationRegion(item);
     const target = resolved || (item.id === 'rhodes' ? { ...INITIAL_REGION, latitude: 36.1667, longitude: 27.95 } : item.id === 'bali' ? { ...INITIAL_REGION, latitude: -8.4095, longitude: 115.1889 } : INITIAL_REGION);
     setRegion(target);
+    setCameraCommand(value => value + 1);
   }, []);
 
   const submitNewTip = useCallback(async payload => {
@@ -441,7 +443,7 @@ export default function App() {
       <View style={styles.main}>
         {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} onAddPlace={openAddTip} /> : null}
         {tab === 'feed' ? <FeedScreen /> : null}
-        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} onAddPlace={openAddTip} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
+        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} onAddPlace={openAddTip} selectedPin={selectedPin} region={region} setRegion={setRegion} cameraCommand={cameraCommand} /> : null}
         {tab === 'trips' ? <TripsScreen trips={myTrips} loading={tripsLoading} /> : null}
         {tab === 'profile' ? <ProfileScreen client={supabase} /> : null}
       </View>
