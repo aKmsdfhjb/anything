@@ -4,8 +4,9 @@
 
 1. Install Node.js and npm, then run `npm install` in the repository root.
 2. Copy `.env.example` to `.env.local` (or configure Expo public environment variables) and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` for live data. Leave them unset to preview with sample travel tips.
-3. Optionally set `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` to enable live destination geocoding. Use a public token with appropriate usage restrictions; this value is bundled into the client app.
-4. Run `npm install`, `npm run verify:milestone1`, and `npx expo start`. `react-native-maps` may require a development build for some native configurations.
+3. Set `GOOGLE_MAPS_API_KEY` to a key restricted to your Android package/signing certificate so native Android maps can render.
+4. Optionally set `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` to enable live destination geocoding. Use a public token with appropriate usage restrictions; this value is bundled into the client app.
+5. Run `npm install`, `npm run verify:milestone1`, and `npx expo start`. `react-native-maps` may require a development build for some native configurations.
 
 The UI includes Explore, Feed, Trips, Map and Profile tabs; a teal/mint theme; 12 category filters; memoized map markers; debounced viewport RPC; optional Mapbox destination search and map camera bounds; a no-results add-tip fallback; email sign-up/sign-in; tip publishing; and saved-tip pointers into user-owned trips. It is a new scaffold because the branch did not contain an existing app entry point or package manifest when inspected.
 
@@ -19,14 +20,15 @@ The UI includes Explore, Feed, Trips, Map and Profile tabs; a teal/mint theme; 1
 - `supabase/migrations/20261009000200_viewport_rpc_coordinates.sql` — explicit viewport latitude/longitude RPC output.
 - `supabase/verification/milestone_1_phase_1_2.sql` — post-migration schema/RLS/index checks.
 - `supabase/verification/benchmark_map_pins.sql` — transaction-rolled-back spatial query benchmark fixture.
+- `app.config.js` — configures the Android Maps key from `GOOGLE_MAPS_API_KEY`.
 - `.env.example` — placeholders only; no credentials are included.
 
 ## Configure and verify
 1. In Supabase Auth settings, choose your sign-up/email-confirmation behavior and configure redirect URLs for your app.
 2. Apply both timestamped migrations in order. The second replaces the initial viewport RPC with an explicit-coordinate return shape.
 3. Run `supabase/verification/milestone_1_phase_1_2.sql` in the Supabase SQL Editor and inspect the RLS policy output.
-4. Run `supabase/verification/benchmark_map_pins.sql` in a non-production/test project to inspect `EXPLAIN ANALYZE` query timing. Its generated pins are rolled back at the end.
-5. In the app, open Profile and sign up/sign in. Add a tip with valid coordinates, select it on the map, save it to a trip, and verify that the trip remains private to the signed-in user.
+5. Run `supabase/verification/benchmark_map_pins.sql` in a non-production/test project to inspect `EXPLAIN ANALYZE` query timing. Its generated pins are rolled back at the end.
+6. In the app, open Profile and sign up/sign in. Add a tip with valid coordinates, select it on the map, save it to a trip, and verify that the trip remains private to the signed-in user.
 
 ## Apply safely
 1. Create/select the intended Supabase project and back up any existing database.
