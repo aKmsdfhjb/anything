@@ -199,8 +199,38 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPla
 function TripsScreen({ trips = [], loading = false }) {
   return <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}><BrandHeader eyebrow="YOUR ADVENTURES" title="My Trips ✈" subtitle="Keep your favorite tips together." /><View style={styles.contentPad}>{loading ? <ActivityIndicator color={colors.teal} /> : trips.length ? trips.map(trip => <View key={trip.id} style={styles.tripCard}><Text style={styles.tripCardTitle}>{trip.title}</Text><Text style={styles.tripCardMeta}>{trip.description || 'Your saved travel tips will appear in this itinerary.'}</Text></View>) : <View style={styles.emptyTrip}><Text style={styles.emptyTripEmoji}>✈️</Text><Text style={styles.emptyTripTitle}>No trips yet!</Text><Text style={styles.emptyTripBody}>Save a tip to a new trip to start planning your next adventure.</Text></View>}</View></ScrollView>;
 }
-function ProfileScreen() {
-  return <View style={styles.screen}><BrandHeader eyebrow="YOUR TRAVEL PROFILE" title="Your profile" subtitle="Your discoveries, all in one place." /><View style={styles.profileCard}><View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>✈</Text></View><Text style={styles.profileName}>Welcome, traveler!</Text><Text style={styles.profileDescription}>Connect authentication to save your profile, tips and trips.</Text></View></View>;
+function ProfileScreen({ client }) {
+  const [session, setSession] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [createAccount, setCreateAccount] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    if (!client) return undefined;
+    client.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    return () => listener.subscription.unsubscribe();
+  }, [client]);
+  const authenticate = async () => {
+    if (!client) { setMessage('Configure Supabase URL and anon key first.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      const result = createAccount
+        ? await client.auth.signUp({ email: email.trim(), password })
+        : await client.auth.signInWithPassword({ email: email.trim(), password });
+      if (result.error) throw result.error;
+      if (createAccount && !result.data.session) setMessage('Account created. Check your email to confirm, then sign in.');
+      else setMessage(createAccount ? 'Account created and signed in.' : 'Signed in successfully.');
+    } catch (e) { setMessage(e.message || 'Authentication failed.'); }
+    finally { setBusy(false); }
+  };
+  const signOut = async () => {
+    if (!client) return;
+    const { error } = await client.auth.signOut();
+    setMessage(error ? error.message : 'Signed out.');
+  };
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}><BrandHeader eyebrow="YOUR TRAVEL PROFILE" title="Your profile" subtitle="Your discoveries, all in one place." /><View style={styles.profileCard}><View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>✈</Text></View><Text style={styles.profileName}>{session?.user?.email || 'Welcome, traveler!'}</Text><Text style={styles.profileDescription}>{session ? 'You are signed in. You can publish tips and save them to private trips.' : 'Sign in or create an account to publish tips and keep your itineraries private.'}</Text>{!session ? <><TextInput style={[styles.formInput, styles.authInput]} value={email} onChangeText={setEmail} placeholder="Email address" keyboardType="email-address" autoCapitalize="none" autoComplete="email" placeholderTextColor={colors.muted} /><TextInput style={[styles.formInput, styles.authInput]} value={password} onChangeText={setPassword} placeholder="Password (at least 6 characters)" secureTextEntry autoComplete={createAccount ? 'new-password' : 'password'} placeholderTextColor={colors.muted} /><Pressable disabled={busy} style={[styles.primaryButton, styles.authButton]} onPress={authenticate}><Text style={styles.primaryButtonText}>{busy ? 'Please wait…' : createAccount ? 'Create account' : 'Sign in'}</Text></Pressable><Pressable onPress={() => { setCreateAccount(!createAccount); setMessage(''); }}><Text style={styles.authSwitch}>{createAccount ? 'Already have an account? Sign in' : 'New to TipTrip? Create an account'}</Text></Pressable></> : <Pressable style={styles.primaryButton} onPress={signOut}><Text style={styles.primaryButtonText}>Sign out</Text></Pressable>}{message ? <Text style={styles.authMessage}>{message}</Text> : null}</View></ScrollView>;
 }
 function EmptyState({ title, body }) { return <View style={styles.emptyState}><Text style={styles.emptyTitle}>{title}</Text><Text style={styles.emptyBody}>{body}</Text></View>; }
 
@@ -411,7 +441,7 @@ export default function App() {
         {tab === 'feed' ? <FeedScreen /> : null}
         {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} onAddPlace={openAddTip} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
         {tab === 'trips' ? <TripsScreen trips={myTrips} loading={tripsLoading} /> : null}
-        {tab === 'profile' ? <ProfileScreen /> : null}
+        {tab === 'profile' ? <ProfileScreen client={supabase} /> : null}
       </View>
       {selectedPin ? <View style={styles.selectedPanel}><Pressable onPress={() => setSelectedPin(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable><Text style={styles.selectedTitle}>{selectedPin.title}</Text><Text style={styles.selectedDescription}>{selectedPin.description || selectedPin.city || 'Travel tip'}</Text><Pressable style={[styles.primaryButton, styles.saveTipButton]} onPress={() => setSaveTripVisible(true)}><Text style={styles.primaryButtonText}>＋ Save to trip</Text></Pressable></View> : null}
       {notice ? <Pressable style={styles.noticeToast} onPress={() => setNotice('')}><Text style={styles.noticeText}>{notice}  ×</Text></Pressable> : null}
@@ -535,6 +565,10 @@ const styles = StyleSheet.create({
   tripCardTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   tripCardMeta: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 },
   saveTipButton: { alignSelf: 'flex-start', marginTop: 12 },
+  authInput: { width: '100%', marginTop: 12, marginBottom: 0 },
+  authButton: { marginTop: 14 },
+  authSwitch: { color: colors.tealDark, fontSize: 12, fontWeight: '800', marginTop: 16 },
+  authMessage: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 12 },
   noticeToast: { position: 'absolute', top: 48, left: 18, right: 18, padding: 13, borderRadius: 12, backgroundColor: colors.tealDark, zIndex: 20 },
   noticeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   mapLegend: { paddingHorizontal: 20, paddingVertical: 12 },
