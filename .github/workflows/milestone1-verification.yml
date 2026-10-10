@@ -14,7 +14,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run static Phase 1 and Phase 2 acceptance checks
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Run milestone acceptance checks
         run: npm run verify:phase1-2
       - name: Validate package manifest
         run: node -e "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')); console.log('package.json valid')"
+      - name: Bundle Expo Android JavaScript
+        run: npx expo export --platform android
