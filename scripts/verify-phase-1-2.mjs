@@ -51,6 +51,9 @@ check('Tip creation writes a PostGIS point', /st_set|POINT\(/i.test(tripReposito
 check('Save-to-trip uses relational saved_tips pointers', /from\('saved_tips'\)/.test(tripRepository) && /trip_id,map_pin_id/.test(tripRepository));
 check('Profile supports sign-up and sign-in', /signUp\(/.test(app) && /signInWithPassword\(/.test(app));
 check('Teal fallback and modal UI styles exist', /mapEmptyOverlay/.test(app) && /modalCard/.test(app) && /borderRadius: radii\.lg/.test(app));
+check('Feed empty-state conditional is closed correctly', /visible\.map\(item => <TipCard[\\s\\S]*?\\/>\\) : <EmptyState/.test(app));
+check('Trips screen renders saved relational tip pointers', /listSavedTips\(client, trip\.id\)/.test(app) && /savedByTrip\[trip\.id\]/.test(app));
+check('Shared card radius matches the 16px spec', /radii = \{ sm: 10, md: 16, lg: 16, pill: 999 \}/.test(theme));
 check('Mapbox token is documented without a real secret', /EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=YOUR_/.test(env));
 check('README documents user acceptance steps', /sign up\/sign in/i.test(readme) && /benchmark_map_pins\.sql/.test(readme));
 check('CI workflow installs dependencies and bundles app', /npm ci|npm install/.test(workflow) && /expo export/.test(workflow));
