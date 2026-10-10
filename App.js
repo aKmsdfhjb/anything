@@ -172,7 +172,7 @@ function FeedScreen() {
   );
 }
 
-function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, selectedPin, region, setRegion }) {
+function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPlace, selectedPin, region, setRegion }) {
   const category = useMapPinStore(state => state.activeCategory);
   const setCategory = useMapPinStore(state => state.setActiveCategory);
   const visiblePins = pins.filter(p => category === 'all' || String(p.category || 'general').toLowerCase() === category);
@@ -188,6 +188,7 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, selected
         </MapView>
         {loading ? <View style={styles.mapStatus}><ActivityIndicator color={colors.teal} /><Text style={styles.mapStatusText}>Finding tips in this area…</Text></View> : null}
         {error ? <View style={styles.mapStatus}><Text style={styles.mapStatusText}>{error}</Text></View> : null}
+        {!loading && visiblePins.length === 0 ? <View style={styles.mapEmptyOverlay}><Text style={styles.fallbackTitle}>Don't see your place?</Text><Text style={styles.fallbackBody}>There are no tips in this map view yet. Be the first to add one.</Text><Pressable style={styles.primaryButton} onPress={() => onAddPlace({ title: '', region })}><Text style={styles.primaryButtonText}>＋ Add a Place & Tip</Text></Pressable></View> : null}
         <Pressable style={styles.recenterButton} onPress={() => { setRegion(INITIAL_REGION); onRegionChange(INITIAL_REGION); }}><Text style={styles.recenterText}>◎</Text></Pressable>
       </View>
       <View style={styles.mapLegend}><Text style={styles.mapLegendTitle}>{visiblePins.length} tips in view</Text><Text style={styles.mapLegendSub}>{supabase ? 'Connected to Supabase' : 'Preview data · add Supabase keys to load live tips'}</Text></View>
@@ -195,8 +196,8 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, selected
   );
 }
 
-function TripsScreen() {
-  return <View style={styles.screen}><BrandHeader eyebrow="YOUR ADVENTURES" title="My Trips ✈" subtitle="Keep your favorite tips together." /><View style={styles.emptyTrip}><Text style={styles.emptyTripEmoji}>✈️</Text><Text style={styles.emptyTripTitle}>No trips yet!</Text><Text style={styles.emptyTripBody}>Start planning your next adventure and save tips from the map.</Text></View></View>;
+function TripsScreen({ trips = [], loading = false }) {
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}><BrandHeader eyebrow="YOUR ADVENTURES" title="My Trips ✈" subtitle="Keep your favorite tips together." /><View style={styles.contentPad}>{loading ? <ActivityIndicator color={colors.teal} /> : trips.length ? trips.map(trip => <View key={trip.id} style={styles.tripCard}><Text style={styles.tripCardTitle}>{trip.title}</Text><Text style={styles.tripCardMeta}>{trip.description || 'Your saved travel tips will appear in this itinerary.'}</Text></View>) : <View style={styles.emptyTrip}><Text style={styles.emptyTripEmoji}>✈️</Text><Text style={styles.emptyTripTitle}>No trips yet!</Text><Text style={styles.emptyTripBody}>Save a tip to a new trip to start planning your next adventure.</Text></View>}</View></ScrollView>;
 }
 function ProfileScreen() {
   return <View style={styles.screen}><BrandHeader eyebrow="YOUR TRAVEL PROFILE" title="Your profile" subtitle="Your discoveries, all in one place." /><View style={styles.profileCard}><View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>✈</Text></View><Text style={styles.profileName}>Welcome, traveler!</Text><Text style={styles.profileDescription}>Connect authentication to save your profile, tips and trips.</Text></View></View>;
@@ -312,6 +313,12 @@ export default function App() {
   const [error, setError] = useState('');
   const [region, setRegion] = useState(INITIAL_REGION);
   const [selectedPin, setSelectedPin] = useState(null);
+  const [addTipDestination, setAddTipDestination] = useState(null);
+  const [addTipVisible, setAddTipVisible] = useState(false);
+  const [saveTripVisible, setSaveTripVisible] = useState(false);
+  const [myTrips, setMyTrips] = useState([]);
+  const [tripsLoading, setTripsLoading] = useState(false);
+  const [notice, setNotice] = useState('');
   const requestSequence = useRef(0);
   const debounceTimer = useRef(null);
 
@@ -347,12 +354,45 @@ export default function App() {
   }, [loadViewport]);
 
   useEffect(() => { if (tab === 'map') scheduleViewportLoad(region); }, [tab, region, scheduleViewportLoad]);
+  useEffect(() => {
+    let active = true;
+    if (tab === 'trips' && supabase) {
+      setTripsLoading(true);
+      listMyTrips(supabase).then(result => { if (active) setMyTrips(result.trips); }).catch(e => { if (active) setNotice(e.message || 'Could not load trips.'); }).finally(() => { if (active) setTripsLoading(false); });
+    }
+    return () => { active = false; };
+  }, [tab]);
   useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); requestSequence.current += 1; }, []);
+
+  const openAddTip = useCallback(destination => {
+    setAddTipDestination(destination || null);
+    setAddTipVisible(true);
+  }, []);
 
   const chooseDestination = useCallback(item => {
     setTab('map');
-    const target = item.id === 'rhodes' ? { ...INITIAL_REGION, latitude: 36.1667, longitude: 27.95 } : item.id === 'bali' ? { ...INITIAL_REGION, latitude: -8.4095, longitude: 115.1889 } : INITIAL_REGION;
+    const resolved = destinationRegion(item);
+    const target = resolved || (item.id === 'rhodes' ? { ...INITIAL_REGION, latitude: 36.1667, longitude: 27.95 } : item.id === 'bali' ? { ...INITIAL_REGION, latitude: -8.4095, longitude: 115.1889 } : INITIAL_REGION);
     setRegion(target);
+  }, []);
+
+  const submitNewTip = useCallback(async payload => {
+    if (!supabase) throw new Error('Configure Supabase URL and anon key before publishing tips.');
+    const created = await createTip(supabase, payload);
+    setPins([...useMapPinStore.getState().pins, created], 'new-tip');
+    setAddTipVisible(false);
+    setTab('map');
+    setRegion({ latitude: created.latitude, longitude: created.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 });
+    setNotice('Your tip was published.');
+  }, [setPins]);
+
+  const submitSaveTip = useCallback(async (tripId, pin) => {
+    if (!supabase) throw new Error('Configure Supabase before saving tips.');
+    if (!pin?.id || String(pin.id).startsWith('demo-')) throw new Error('Demo tips cannot be saved. Select a real tip loaded from Supabase.');
+    await saveTipToTrip(supabase, tripId, pin.id);
+    const result = await listMyTrips(supabase);
+    setMyTrips(result.trips);
+    setNotice('Tip saved to your trip.');
   }, []);
 
   const nav = [
@@ -369,11 +409,14 @@ export default function App() {
       <View style={styles.main}>
         {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} onAddPlace={openAddTip} /> : null}
         {tab === 'feed' ? <FeedScreen /> : null}
-        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
-        {tab === 'trips' ? <TripsScreen /> : null}
+        {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} onAddPlace={openAddTip} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
+        {tab === 'trips' ? <TripsScreen trips={myTrips} loading={tripsLoading} /> : null}
         {tab === 'profile' ? <ProfileScreen /> : null}
       </View>
-      {selectedPin ? <View style={styles.selectedPanel}><Pressable onPress={() => setSelectedPin(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable><Text style={styles.selectedTitle}>{selectedPin.title}</Text><Text style={styles.selectedDescription}>{selectedPin.description || selectedPin.city || 'Travel tip'}</Text></View> : null}
+      {selectedPin ? <View style={styles.selectedPanel}><Pressable onPress={() => setSelectedPin(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable><Text style={styles.selectedTitle}>{selectedPin.title}</Text><Text style={styles.selectedDescription}>{selectedPin.description || selectedPin.city || 'Travel tip'}</Text><Pressable style={[styles.primaryButton, styles.saveTipButton]} onPress={() => setSaveTripVisible(true)}><Text style={styles.primaryButtonText}>＋ Save to trip</Text></Pressable></View> : null}
+      {notice ? <Pressable style={styles.noticeToast} onPress={() => setNotice('')}><Text style={styles.noticeText}>{notice}  ×</Text></Pressable> : null}
+      <AddTipModal visible={addTipVisible} destination={addTipDestination} defaultRegion={region} onClose={() => setAddTipVisible(false)} onSubmit={submitNewTip} />
+      <SaveTripModal visible={saveTripVisible} pin={selectedPin} onClose={() => setSaveTripVisible(false)} onSave={submitSaveTip} />
       <View style={styles.bottomNav}>
         {nav.map(item => <Pressable key={item.id} onPress={() => { setSelectedPin(null); setTab(item.id); }} style={styles.navItem} accessibilityRole="button" accessibilityState={{ selected: tab === item.id }}><Text style={[styles.navGlyph, tab === item.id && styles.navGlyphActive]}>{item.glyph}</Text><Text style={[styles.navLabel, tab === item.id && styles.navLabelActive]}>{item.label}</Text></Pressable>)}
       </View>
