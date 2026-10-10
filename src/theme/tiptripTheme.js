@@ -16,7 +16,7 @@ export const colors = {
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radii = { sm: 10, md: 16, lg: 22, pill: 999 };
+export const radii = { sm: 10, md: 16, lg: 16, pill: 999 };
 export const typography = {
   screenTitle: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
   sectionTitle: { fontSize: 21, lineHeight: 27, fontWeight: '750' },
