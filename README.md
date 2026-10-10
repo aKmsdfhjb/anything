@@ -1,4 +1,4 @@
-# TipTrip — Milestone 1, Phase 1
+# TipTrip — Milestone 1: PostGIS Map Engine, Search & Core UI
 
 ## Run the Expo UI scaffold
 
