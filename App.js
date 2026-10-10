@@ -173,6 +173,8 @@ function FeedScreen() {
 }
 
 function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPlace, selectedPin, region, setRegion }) {
+  const mapRef = useRef(null);
+  useEffect(() => { if (region) mapRef.current?.animateToRegion(region, 550); }, [region]);
   const category = useMapPinStore(state => state.activeCategory);
   const setCategory = useMapPinStore(state => state.setActiveCategory);
   const visiblePins = pins.filter(p => category === 'all' || String(p.category || 'general').toLowerCase() === category);
@@ -183,7 +185,7 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPla
         {[{ id: 'all', label: 'All tips' }, ...TIP_CATEGORIES].map(c => <Pressable key={c.id} onPress={() => setCategory(c.id)} style={[styles.filterChip, category === c.id && styles.filterChipActive]}><Text style={[styles.filterText, category === c.id && styles.filterTextActive]}>{c.label}</Text></Pressable>)}
       </ScrollView>
       <View style={styles.mapFrame}>
-        <MapView style={StyleSheet.absoluteFill} initialRegion={INITIAL_REGION} region={region} onRegionChangeComplete={r => { setRegion(r); onRegionChange(r); }} showsUserLocation={false} showsCompass>
+        <MapView ref={mapRef} style={StyleSheet.absoluteFill} initialRegion={INITIAL_REGION} region={region} onRegionChangeComplete={r => { setRegion(r); onRegionChange(r); }} showsUserLocation={false} showsCompass>
           {visiblePins.map(pin => <TipMarker key={pin.id} pin={pin} selected={selectedPin?.id === pin.id} onPress={onSelectPin} />)}
         </MapView>
         {loading ? <View style={styles.mapStatus}><ActivityIndicator color={colors.teal} /><Text style={styles.mapStatusText}>Finding tips in this area…</Text></View> : null}
