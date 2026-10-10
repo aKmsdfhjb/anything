@@ -11,7 +11,7 @@ import { colors, radii, shadows, spacing, typography, categoryColors } from './s
 import { TIP_CATEGORIES } from './src/theme/tipCategories';
 import { useMapPinStore } from './src/state/mapPinStore';
 import { searchDestinations, destinationRegion } from './src/services/geocoding';
-import { createTip, createTrip, listMyTrips, saveTipToTrip } from './src/services/tripRepository';
+import { createTip, createTrip, listMyTrips, listSavedTips, saveTipToTrip } from './src/services/tripRepository';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -198,8 +198,18 @@ function MapScreen({ pins, loading, error, onRegionChange, onSelectPin, onAddPla
   );
 }
 
-function TripsScreen({ trips = [], loading = false }) {
-  return <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}><BrandHeader eyebrow="YOUR ADVENTURES" title="My Trips ✈" subtitle="Keep your favorite tips together." /><View style={styles.contentPad}>{loading ? <ActivityIndicator color={colors.teal} /> : trips.length ? trips.map(trip => <View key={trip.id} style={styles.tripCard}><Text style={styles.tripCardTitle}>{trip.title}</Text><Text style={styles.tripCardMeta}>{trip.description || 'Your saved travel tips will appear in this itinerary.'}</Text></View>) : <View style={styles.emptyTrip}><Text style={styles.emptyTripEmoji}>✈️</Text><Text style={styles.emptyTripTitle}>No trips yet!</Text><Text style={styles.emptyTripBody}>Save a tip to a new trip to start planning your next adventure.</Text></View>}</View></ScrollView>;
+function TripsScreen({ client, trips = [], loading = false }) {
+  const [savedByTrip, setSavedByTrip] = useState({});
+  useEffect(() => {
+    let active = true;
+    if (!client || !trips.length) { setSavedByTrip({}); return undefined; }
+    Promise.all(trips.map(async trip => {
+      try { return [trip.id, await listSavedTips(client, trip.id)]; }
+      catch { return [trip.id, []]; }
+    })).then(entries => { if (active) setSavedByTrip(Object.fromEntries(entries)); });
+    return () => { active = false; };
+  }, [client, trips]);
+  return <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}><BrandHeader eyebrow="YOUR ADVENTURES" title="My Trips ✈" subtitle="Keep your favorite tips together." /><View style={styles.contentPad}>{loading ? <ActivityIndicator color={colors.teal} /> : trips.length ? trips.map(trip => <View key={trip.id} style={styles.tripCard}><Text style={styles.tripCardTitle}>{trip.title}</Text><Text style={styles.tripCardMeta}>{(savedByTrip[trip.id] || []).length} saved tips</Text>{(savedByTrip[trip.id] || []).map(saved => <View key={saved.id} style={styles.savedTipRow}><Text style={styles.savedTipTitle}>{saved.map_pins?.title || 'Saved travel tip'}</Text>{saved.map_pins?.description ? <Text style={styles.tripCardMeta}>{saved.map_pins.description}</Text> : null}</View>)}</View>) : <View style={styles.emptyTrip}><Text style={styles.emptyTripEmoji}>✈️</Text><Text style={styles.emptyTripTitle}>No trips yet!</Text><Text style={styles.emptyTripBody}>Save a tip to a new trip to start planning your next adventure.</Text></View>}</View></ScrollView>;
 }
 function ProfileScreen({ client }) {
   const [session, setSession] = useState(null);
@@ -444,7 +454,7 @@ export default function App() {
         {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} onAddPlace={openAddTip} /> : null}
         {tab === 'feed' ? <FeedScreen /> : null}
         {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} onAddPlace={openAddTip} selectedPin={selectedPin} region={region} setRegion={setRegion} cameraCommand={cameraCommand} /> : null}
-        {tab === 'trips' ? <TripsScreen trips={myTrips} loading={tripsLoading} /> : null}
+        {tab === 'trips' ? <TripsScreen client={supabase} trips={myTrips} loading={tripsLoading} /> : null}
         {tab === 'profile' ? <ProfileScreen client={supabase} /> : null}
       </View>
       {selectedPin ? <View style={styles.selectedPanel}><Pressable onPress={() => setSelectedPin(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable><Text style={styles.selectedTitle}>{selectedPin.title}</Text><Text style={styles.selectedDescription}>{selectedPin.description || selectedPin.city || 'Travel tip'}</Text><Pressable style={[styles.primaryButton, styles.saveTipButton]} onPress={() => setSaveTripVisible(true)}><Text style={styles.primaryButtonText}>＋ Save to trip</Text></Pressable></View> : null}
@@ -568,6 +578,8 @@ const styles = StyleSheet.create({
   tripCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 16, marginBottom: 12, ...shadows.card },
   tripCardTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
   tripCardMeta: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 },
+  savedTipRow: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, marginTop: 10 },
+  savedTipTitle: { color: colors.text, fontSize: 13, fontWeight: '800' },
   saveTipButton: { alignSelf: 'flex-start', marginTop: 12 },
   authInput: { width: '100%', marginTop: 12, marginBottom: 0 },
   authButton: { marginTop: 14 },
