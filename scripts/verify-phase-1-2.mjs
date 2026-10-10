@@ -26,6 +26,7 @@ const env = read('.env.example');
 const pkg = JSON.parse(read('package.json'));
 const workflow = read('.github/workflows/milestone1-verification.yml');
 const appConfig = read('app.config.js');
+const gitignore = read('.gitignore');
 
 check('PostGIS extension enabled', /create extension if not exists postgis/i.test(schema));
 check('Five core tables exist', ['profiles','destinations','map_pins','trips','saved_tips'].every(t => new RegExp(`create table if not exists public\\.${t}\\b`, 'i').test(schema)));
@@ -59,6 +60,8 @@ check('Mapbox token is documented without a real secret', /EXPO_PUBLIC_MAPBOX_AC
 check('Android Google Maps key is configured from environment', /GOOGLE_MAPS_API_KEY/.test(appConfig) && /GOOGLE_MAPS_API_KEY=YOUR_/.test(env));
 check('README documents user acceptance steps', /sign up\/sign in/i.test(readme) && /benchmark_map_pins\.sql/.test(readme));
 check('CI workflow installs dependencies and bundles app', /npm ci|npm install/.test(workflow) && /expo export/.test(workflow));
+
+check('Local secrets and generated files are ignored', /!\.env\.example/.test(gitignore) && /node_modules\//.test(gitignore));
 
 const failed = checks.filter(x => !x.pass);
 console.log(`\nStatic acceptance checks: ${checks.length - failed.length}/${checks.length} passed.`);
