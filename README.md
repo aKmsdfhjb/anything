@@ -5,7 +5,7 @@
 1. Install Node.js and npm, then run `npm install` in the repository root.
 2. Copy `.env.example` to `.env.local` (or configure Expo public environment variables) and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` for live data. Leave them unset to preview with sample travel tips.
 3. Optionally set `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` to enable live destination geocoding. Use a public token with appropriate usage restrictions; this value is bundled into the client app.
-4. Run `npm install`, `npm run verify:phase1-2`, and `npx expo start`. `react-native-maps` may require a development build for some native configurations.
+4. Run `npm install`, `npm run verify:milestone1`, and `npx expo start`. `react-native-maps` may require a development build for some native configurations.
 
 The UI includes Explore, Feed, Trips, Map and Profile tabs; a teal/mint theme; 12 category filters; memoized map markers; debounced viewport RPC; optional Mapbox destination search and map camera bounds; a no-results add-tip fallback; email sign-up/sign-in; tip publishing; and saved-tip pointers into user-owned trips. It is a new scaffold because the branch did not contain an existing app entry point or package manifest when inspected.
 
