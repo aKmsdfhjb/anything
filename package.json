@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "verify:phase1-2": "node scripts/verify-phase-1-2.mjs"
+    "verify:phase1-2": "node scripts/verify-phase-1-2.mjs",
+    "verify:milestone1": "node scripts/verify-phase-1-2.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
