@@ -10,6 +10,8 @@ import TipMarker from './src/components/TipMarker';
 import { colors, radii, shadows, spacing, typography, categoryColors } from './src/theme/tiptripTheme';
 import { TIP_CATEGORIES } from './src/theme/tipCategories';
 import { useMapPinStore } from './src/state/mapPinStore';
+import { searchDestinations, destinationRegion } from './src/services/geocoding';
+import { createTip, createTrip, listMyTrips, saveTipToTrip } from './src/services/tripRepository';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -98,20 +100,55 @@ function TipCard({ item, onLove }) {
   );
 }
 
-function ExploreScreen({ onDestination, onTab }) {
+function ExploreScreen({ onDestination, onTab, onAddPlace }) {
   const [search, setSearch] = useState('');
+  const [remoteResults, setRemoteResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const destinations = DEMO_DESTINATIONS.filter(d => (d.title + d.country + d.subtitle).toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    if (search.trim().length < 2 || !process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN) {
+      setRemoteResults([]);
+      setSearching(false);
+      setSearchError('');
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      setSearchError('');
+      try {
+        const results = await searchDestinations(search, { signal: controller.signal });
+        setRemoteResults(results);
+      } catch (error) {
+        if (error.name !== 'AbortError') setSearchError('Destination search is temporarily unavailable.');
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [search]);
+  const chooseResult = item => onDestination({
+    ...item,
+    title: item.title || item.placeName,
+    country: item.country || '',
+    region: destinationRegion(item),
+  });
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <BrandHeader eyebrow="PLAN. DISCOVER. SHARE." title="Travel smarter." subtitle="Real travel tips from real people." />
       <View style={styles.contentPad}>
         <SearchBox value={search} onChangeText={setSearch} />
+        {searching ? <View style={styles.searchStatus}><ActivityIndicator color={colors.teal} /><Text style={styles.searchStatusText}>Searching destinations…</Text></View> : null}
+        {searchError ? <Text style={styles.inlineError}>{searchError}</Text> : null}
+        {remoteResults.length ? <View style={styles.geocodeResults}>{remoteResults.map(item => <Pressable key={item.id} onPress={() => chooseResult(item)} style={styles.geocodeResult}><Text style={styles.geocodeResultTitle}>{item.title}</Text><Text style={styles.geocodeResultSubtitle}>{item.placeName}</Text><Text style={styles.geocodeArrow}>↗</Text></Pressable>)}</View> : null}
+        {search.trim().length >= 2 && !searching && !remoteResults.length && !destinations.length ? <View style={styles.fallbackCard}><Text style={styles.fallbackTitle}>Don't see your place?</Text><Text style={styles.fallbackBody}>Add the destination and share the first tip for it.</Text><Pressable style={styles.primaryButton} onPress={() => onAddPlace({ title: search.trim() })}><Text style={styles.primaryButtonText}>＋ Add a Place & Tip</Text></Pressable></View> : null}
         <View style={styles.quickChips}><Text style={styles.quickChipActive}>✦ On fire</Text><Text style={styles.quickChip}>↗ Fresh</Text><Text style={styles.quickChip}>★ Top picks</Text></View>
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Popular destinations</Text><Pressable onPress={() => onTab('map')}><Text style={styles.seeAll}>Explore map ›</Text></Pressable></View>
         <FlatList data={destinations} horizontal keyExtractor={x => x.id} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingBottom: 8 }} renderItem={({ item }) => <DestinationCard item={item} onPress={onDestination} />} />
         <View style={[styles.sectionHeader, { marginTop: 22 }]}><Text style={styles.sectionTitle}>What's hot 🔥</Text><Pressable onPress={() => onTab('feed')}><Text style={styles.seeAll}>See all ›</Text></Pressable></View>
         {DEMO_TIPS.slice(0, 2).map(tip => <TipCard key={tip.id} item={tip} onLove={() => onTab('feed')} />)}
-        <View style={styles.ctaCard}><Text style={styles.ctaTitle}>Your next great tip starts here</Text><Text style={styles.ctaText}>Share a place that made your trip special.</Text><Pressable style={styles.primaryButton} onPress={() => onTab('map')}><Text style={styles.primaryButtonText}>＋ Leave a tip</Text></Pressable></View>
+        <View style={styles.ctaCard}><Text style={styles.ctaTitle}>Your next great tip starts here</Text><Text style={styles.ctaText}>Share a place that made your trip special.</Text><Pressable style={styles.primaryButton} onPress={() => onAddPlace({ title: '' })}><Text style={styles.primaryButtonText}>＋ Leave a tip</Text></Pressable></View>
       </View>
     </ScrollView>
   );
@@ -229,7 +266,7 @@ export default function App() {
     <SafeAreaView style={styles.app}>
       <StatusBar barStyle="light-content" backgroundColor={colors.tealDark} />
       <View style={styles.main}>
-        {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} /> : null}
+        {tab === 'explore' ? <ExploreScreen onDestination={chooseDestination} onTab={setTab} onAddPlace={openAddTip} /> : null}
         {tab === 'feed' ? <FeedScreen /> : null}
         {tab === 'map' ? <MapScreen pins={pins} loading={loading} error={error} onRegionChange={scheduleViewportLoad} onSelectPin={setSelectedPin} selectedPin={selectedPin} region={region} setRegion={setRegion} /> : null}
         {tab === 'trips' ? <TripsScreen /> : null}
