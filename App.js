@@ -10,7 +10,6 @@ import TipMarker from './src/components/TipMarker';
 import { colors, radii, shadows, spacing, typography, categoryColors } from './src/theme/tiptripTheme';
 import { TIP_CATEGORIES } from './src/theme/tipCategories';
 import { useMapPinStore } from './src/state/mapPinStore';
-import { useMapPinStore } from './src/state/mapPinStore';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -169,12 +168,14 @@ function EmptyState({ title, body }) { return <View style={styles.emptyState}><T
 
 export default function App() {
   const [tab, setTab] = useState('explore');
-  const pins = useMapPinStore(state => state.pins);\n  const setPins = useMapPinStore(state => state.setPins);
+  const pins = useMapPinStore(state => state.pins);
+  const setPins = useMapPinStore(state => state.setPins);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [region, setRegion] = useState(INITIAL_REGION);
   const [selectedPin, setSelectedPin] = useState(null);
-  const requestSequence = useRef(0);\n  const debounceTimer = useRef(null);
+  const requestSequence = useRef(0);
+  const debounceTimer = useRef(null);
 
   const loadViewport = useCallback(async nextRegion => {
     const requestId = ++requestSequence.current;
